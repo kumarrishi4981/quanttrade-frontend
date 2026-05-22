@@ -1,84 +1,72 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Eye } from 'lucide-react';
 import { api } from '../services/api';
+import { ChevronRight, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 
 export default function Results() {
   const [backtests, setBacktests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getBacktests()
-      .then(setBacktests)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    api.getBacktests().then(setBacktests).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
+  if (loading) return <div className="loading-spinner" />;
+
+  const getCurrency = (bt) => bt.stock?.exchange === 'NSE' ? '₹' : '$';
 
   return (
-    <div className="page-container fade-in">
+    <div className="animate-in">
       <div className="page-header">
-        <h1 className="page-title">Backtest Results</h1>
-        <p className="page-subtitle">View and analyze all your completed backtesting runs</p>
+        <div>
+          <h1 className="page-title">Backtest Results</h1>
+          <p className="page-subtitle">{backtests.length} backtests completed</p>
+        </div>
       </div>
 
       {backtests.length > 0 ? (
         <div className="card">
-          <div className="data-table-wrapper">
+          <div className="table-container">
             <table className="data-table">
               <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Stock</th>
-                  <th>Strategy</th>
-                  <th>Period</th>
-                  <th>Capital</th>
-                  <th>Return</th>
-                  <th>Sharpe</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
+                <tr><th>Stock</th><th>Strategy</th><th>Period</th><th>Initial</th><th>Final</th><th>Return</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
-                {backtests.map((bt, i) => (
-                  <tr key={bt.id}>
-                    <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                    <td><span className="stock-symbol" style={{ fontSize: '14px' }}>{bt.stock?.symbol}</span></td>
-                    <td style={{ fontFamily: 'Inter' }}>{bt.strategy?.name}</td>
-                    <td style={{ fontSize: '12px' }}>{bt.startDate} → {bt.endDate}</td>
-                    <td>${bt.initialCapital?.toLocaleString()}</td>
-                    <td>
-                      {bt.result ? (
-                        <span className={bt.result.totalReturn >= 0 ? 'text-green' : 'text-red'} style={{ fontWeight: 700 }}>
-                          {bt.result.totalReturn >= 0 ? '+' : ''}{bt.result.totalReturn}%
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td>{bt.result?.sharpeRatio || '—'}</td>
-                    <td>
-                      <span className={`badge ${bt.status === 'COMPLETED' ? 'badge-green' : bt.status === 'FAILED' ? 'badge-red' : 'badge-amber'}`}>
-                        {bt.status}
-                      </span>
-                    </td>
-                    <td>
-                      <Link to={`/results/${bt.id}`} className="btn btn-secondary btn-sm">
-                        <Eye size={14} /> Details
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {backtests.map((bt, i) => {
+                  const curr = getCurrency(bt);
+                  const ret = bt.result?.totalReturn;
+                  const isPositive = ret > 0;
+                  return (
+                    <tr key={bt.id} className="animate-in" style={{ animationDelay: `${i * 0.03}s` }}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div className="stock-avatar-sm">{bt.stock?.symbol?.slice(0, 2)}</div>
+                          <div>
+                            <div className="text-semibold">{bt.stock?.symbol}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{bt.stock?.exchange}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td><span className="badge badge-primary">{bt.strategy?.name}</span></td>
+                      <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{bt.startDate} → {bt.endDate}</td>
+                      <td className="text-semibold">{curr}{bt.initialCapital?.toLocaleString('en-IN')}</td>
+                      <td className="text-semibold">{curr}{bt.result?.finalCapital?.toLocaleString('en-IN')}</td>
+                      <td>{ret != null ? <span className={`badge ${isPositive ? 'badge-success' : 'badge-danger'}`}>{isPositive ? '+' : ''}{ret}%</span> : '—'}</td>
+                      <td><span className={`badge ${bt.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}`}>{bt.status}</span></td>
+                      <td><Link to={`/results/${bt.id}`} className="btn btn-secondary btn-sm btn-icon"><ChevronRight size={16} /></Link></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       ) : (
-        <div className="card">
-          <div className="empty-state">
-            <div className="empty-state-icon">📊</div>
-            <p className="empty-state-text">No backtest results yet. Run your first backtest!</p>
-            <Link to="/backtest" className="btn btn-primary">Run Backtest</Link>
-          </div>
+        <div className="empty-state">
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+          <h3>No backtest results yet</h3>
+          <p>Run your first backtest to see results here!</p>
+          <Link to="/backtest" className="btn btn-primary" style={{ marginTop: '16px' }}><Zap size={16} /> Run Backtest</Link>
         </div>
       )}
     </div>

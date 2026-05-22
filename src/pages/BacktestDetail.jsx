@@ -1,218 +1,145 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, BarChart3, Target, Shield, Zap } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { ArrowLeft, TrendingUp, TrendingDown, Award, BarChart3, Activity, Shield, Target, Layers } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function BacktestDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [backtest, setBacktest] = useState(null);
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      api.getBacktest(id),
-      api.getBacktestTrades(id),
-    ]).then(([bt, tr]) => {
-      setBacktest(bt);
-      setTrades(tr);
-    }).catch(console.error)
+    Promise.all([api.getBacktest(id), api.getBacktestTrades(id)])
+      .then(([bt, tr]) => { setBacktest(bt); setTrades(tr); })
+      .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
-  if (!backtest) return <div className="page-container"><p>Backtest not found</p></div>;
+  if (loading) return <div className="loading-spinner" />;
+  if (!backtest) return <div className="empty-state"><h3>Backtest not found</h3></div>;
 
-  const r = backtest.result;
-  const isProfit = r && r.totalReturn >= 0;
+  const r = backtest.result || {};
+  const curr = backtest.stock?.exchange === 'NSE' ? '₹' : '$';
+  const isPositive = r.totalReturn > 0;
+  const equityData = trades.filter(t => t.portfolioValue).map((t, i) => ({
+    date: t.date?.slice(5),
+    value: t.portfolioValue,
+  }));
 
-  // Build equity curve from trades
-  const equityData = trades
-    .filter(t => t.portfolioValue)
-    .map(t => ({ date: t.date, value: t.portfolioValue }));
-
-  // Add initial point
-  if (equityData.length > 0) {
-    equityData.unshift({ date: backtest.startDate, value: backtest.initialCapital });
-  }
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px', fontSize: '13px' }}>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '4px' }}>{label}</p>
-          <p style={{ color: 'var(--accent-green)', fontFamily: 'JetBrains Mono' }}>${payload[0].value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const metrics = [
+    { label: 'Final Capital', value: `${curr}${r.finalCapital?.toLocaleString('en-IN')}`, icon: Award, color: isPositive ? 'green' : 'red' },
+    { label: 'Total Return', value: `${isPositive ? '+' : ''}${r.totalReturn}%`, icon: TrendingUp, color: isPositive ? 'green' : 'red' },
+    { label: 'CAGR', value: `${r.cagr}%`, icon: Activity, color: 'purple' },
+    { label: 'Sharpe Ratio', value: r.sharpeRatio?.toFixed(2), icon: BarChart3, color: 'purple' },
+    { label: 'Max Drawdown', value: `${r.maxDrawdown}%`, icon: TrendingDown, color: 'red' },
+    { label: 'Win Rate', value: `${r.winRate}%`, icon: Target, color: r.winRate >= 50 ? 'green' : 'orange' },
+    { label: 'Profit Factor', value: r.profitFactor?.toFixed(2), icon: Shield, color: r.profitFactor >= 1 ? 'green' : 'red' },
+    { label: 'Total Trades', value: r.totalTrades, icon: Layers, color: 'purple' },
+  ];
 
   return (
-    <div className="page-container fade-in">
-      <Link to="/results" className="btn btn-secondary btn-sm mb-24" style={{ width: 'fit-content' }}>
+    <div className="animate-in">
+      <button className="btn btn-secondary btn-sm" onClick={() => navigate('/results')} style={{ marginBottom: '20px' }}>
         <ArrowLeft size={16} /> Back to Results
-      </Link>
+      </button>
 
-      <div className="flex items-center justify-between mb-24" style={{ flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 className="page-title">{backtest.stock?.symbol} · {backtest.strategy?.name}</h1>
-          <p className="page-subtitle">{backtest.startDate} → {backtest.endDate} · Initial: ${backtest.initialCapital?.toLocaleString()}</p>
-        </div>
-        <div>
-          <span className={`badge ${backtest.status === 'COMPLETED' ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '14px', padding: '6px 16px' }}>
-            {backtest.status}
-          </span>
+      {/* Header */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className="stock-avatar" style={{ width: '56px', height: '56px', fontSize: '20px' }}>{backtest.stock?.symbol?.slice(0, 2)}</div>
+            <div>
+              <h1 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>{backtest.stock?.symbol} • {backtest.strategy?.name}</h1>
+              <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: '14px' }}>
+                {backtest.startDate} → {backtest.endDate} • Initial: {curr}{backtest.initialCapital?.toLocaleString('en-IN')}
+              </p>
+            </div>
+          </div>
+          <div className={`badge ${isPositive ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '18px', padding: '8px 20px' }}>
+            {isPositive ? '+' : ''}{r.totalReturn}%
+          </div>
         </div>
       </div>
 
-      {r && (
-        <>
-          <div className="card-grid mb-24">
-            <div className={`stat-card ${isProfit ? 'green' : 'red'}`}>
-              <div className="stat-card-header">
-                <span className="stat-card-label">Total Return</span>
-                <div className={`stat-card-icon ${isProfit ? 'green' : 'red'}`}><TrendingUp size={20} /></div>
-              </div>
-              <div className="stat-card-value" style={{ color: isProfit ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                {isProfit ? '+' : ''}{r.totalReturn}%
-              </div>
-              <div className="stat-card-change" style={{ color: 'var(--text-secondary)' }}>
-                ${backtest.initialCapital?.toLocaleString()} → ${r.finalCapital?.toLocaleString()}
-              </div>
+      {/* Metrics Grid */}
+      <div className="grid-4" style={{ marginBottom: '24px' }}>
+        {metrics.map((m, i) => (
+          <div key={i} className={`stat-card ${m.color}`} style={{ animationDelay: `${i * 0.05}s` }}>
+            <div className="stat-card-content">
+              <div className="stat-label">{m.label}</div>
+              <div className="stat-value" style={{ fontSize: '22px' }}>{m.value}</div>
             </div>
-
-            <div className="stat-card blue">
-              <div className="stat-card-header">
-                <span className="stat-card-label">Sharpe Ratio</span>
-                <div className="stat-card-icon blue"><Shield size={20} /></div>
-              </div>
-              <div className="stat-card-value">{r.sharpeRatio}</div>
-            </div>
-
-            <div className="stat-card amber">
-              <div className="stat-card-header">
-                <span className="stat-card-label">CAGR</span>
-                <div className="stat-card-icon amber"><Zap size={20} /></div>
-              </div>
-              <div className="stat-card-value">{r.cagr}%</div>
-            </div>
-
-            <div className="stat-card red">
-              <div className="stat-card-header">
-                <span className="stat-card-label">Max Drawdown</span>
-                <div className="stat-card-icon red"><Target size={20} /></div>
-              </div>
-              <div className="stat-card-value">-{r.maxDrawdown}%</div>
-            </div>
+            <div className={`stat-icon ${m.color}`}><m.icon size={20} /></div>
           </div>
+        ))}
+      </div>
 
-          <div className="metrics-grid mb-24">
-            <div className="metric-item">
-              <div className="metric-label">Win Rate</div>
-              <div className="metric-value text-green">{r.winRate}%</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Total Trades</div>
-              <div className="metric-value">{r.totalTrades}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Profitable</div>
-              <div className="metric-value text-green">{r.profitableTrades}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Losing</div>
-              <div className="metric-value text-red">{r.losingTrades}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Avg Win</div>
-              <div className="metric-value text-green">${r.avgWin?.toLocaleString()}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Avg Loss</div>
-              <div className="metric-value text-red">${r.avgLoss?.toLocaleString()}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Profit Factor</div>
-              <div className="metric-value">{r.profitFactor}</div>
-            </div>
-            <div className="metric-item">
-              <div className="metric-label">Largest Win</div>
-              <div className="metric-value text-green">${r.largestWin?.toLocaleString()}</div>
-            </div>
-          </div>
-
-          {equityData.length > 1 && (
-            <div className="chart-container mb-24">
-              <div className="chart-title"><TrendingUp size={18} /> Equity Curve</div>
-              <div style={{ height: '350px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={equityData}>
-                    <defs>
-                      <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={isProfit ? '#00d4aa' : '#ff4757'} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={isProfit ? '#00d4aa' : '#ff4757'} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="value" stroke={isProfit ? '#00d4aa' : '#ff4757'} strokeWidth={2} fill="url(#equityGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {trades.length > 0 && (
-        <div className="card">
-          <h3 className="chart-title"><BarChart3 size={18} /> Trade Log ({trades.length} trades)</h3>
-          <div className="data-table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Price</th>
-                  <th>Qty</th>
-                  <th>P&L</th>
-                  <th>Portfolio</th>
-                  <th>Signal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trades.map((t, i) => (
-                  <tr key={t.id}>
-                    <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                    <td>{t.date}</td>
-                    <td>
-                      <span className={`badge ${t.type === 'BUY' ? 'badge-green' : 'badge-red'}`}>
-                        {t.type}
-                      </span>
-                    </td>
-                    <td>${t.price?.toFixed(2)}</td>
-                    <td>{t.quantity}</td>
-                    <td>
-                      {t.pnl != null ? (
-                        <span className={t.pnl >= 0 ? 'text-green' : 'text-red'} style={{ fontWeight: 600 }}>
-                          {t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td>${t.portfolioValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td style={{ fontFamily: 'Inter', fontSize: '12px', color: 'var(--text-secondary)' }}>{t.signal}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Equity Curve */}
+      {equityData.length > 0 && (
+        <div className="card chart-container" style={{ marginBottom: '24px' }}>
+          <h3 style={{ marginBottom: '16px' }}>📈 Equity Curve</h3>
+          <div className="chart-wrapper">
+            <ResponsiveContainer width="100%" height={350}>
+              <AreaChart data={equityData}>
+                <defs>
+                  <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={isPositive ? '#00D09C' : '#EB5B3C'} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={isPositive ? '#00D09C' : '#EB5B3C'} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px' }} />
+                <Area type="monotone" dataKey="value" stroke={isPositive ? '#00D09C' : '#EB5B3C'} fill="url(#eqGrad)" strokeWidth={2} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
+
+      {/* Trade Log */}
+      <div className="card">
+        <h3 style={{ marginBottom: '16px' }}>📋 Trade Log ({trades.length} trades)</h3>
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>P&L</th>
+                <th>Portfolio</th>
+                <th>Signal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map((t, i) => (
+                <tr key={i} className="animate-in" style={{ animationDelay: `${i * 0.02}s` }}>
+                  <td style={{ fontSize: '13px' }}>{t.date}</td>
+                  <td>
+                    <span className={`badge ${t.type === 'BUY' ? 'badge-success' : 'badge-danger'}`}>{t.type}</span>
+                  </td>
+                  <td className="text-semibold">{curr}{t.price?.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                  <td>{t.quantity}</td>
+                  <td>
+                    {t.pnl != null ? (
+                      <span style={{ color: t.pnl >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                        {t.pnl >= 0 ? '+' : ''}{curr}{t.pnl?.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td>{curr}{t.portfolioValue?.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                  <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t.signal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

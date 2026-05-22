@@ -1,8 +1,16 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Build output
+# Build
 dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.production.local
 
 # IDE
 .vscode/
@@ -11,11 +19,6 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
-
-# Environment
-.env
-.env.local
-.env.production.local
 
 # Logs
 *.log

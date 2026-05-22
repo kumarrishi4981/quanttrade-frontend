@@ -1,199 +1,133 @@
 import { useState, useEffect } from 'react';
-import { Brain, Plus, Trash2, Settings2 } from 'lucide-react';
 import { api } from '../services/api';
+import { Plus, Trash2, X } from 'lucide-react';
+
+const typeIcons = { SMA_CROSSOVER: '📊', RSI: '📉', MACD: '📈', BOLLINGER_BANDS: '🎯' };
+const typeLabels = { SMA_CROSSOVER: 'SMA Crossover', RSI: 'RSI Reversal', MACD: 'MACD Crossover', BOLLINGER_BANDS: 'Bollinger Bands' };
 
 export default function Strategies() {
   const [strategies, setStrategies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    name: '', description: '', type: 'SMA_CROSSOVER',
-    indicators: [{ indicatorType: 'SMA', period1: 20, period2: 50, threshold1: null, threshold2: null }],
-  });
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', type: 'SMA_CROSSOVER', indicators: [{ indicatorType: 'SMA', period1: 20, period2: 50, threshold1: null, threshold2: null }] });
 
   useEffect(() => { loadStrategies(); }, []);
 
   const loadStrategies = () => {
-    api.getStrategies()
-      .then(setStrategies)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    setLoading(true);
+    api.getStrategies().then(setStrategies).catch(console.error).finally(() => setLoading(false));
   };
 
   const handleTypeChange = (type) => {
-    let indicators;
+    let ind;
     switch (type) {
-      case 'SMA_CROSSOVER':
-        indicators = [{ indicatorType: 'SMA', period1: 20, period2: 50, threshold1: null, threshold2: null }];
-        break;
-      case 'RSI':
-        indicators = [{ indicatorType: 'RSI', period1: 14, period2: null, threshold1: 30, threshold2: 70 }];
-        break;
-      case 'MACD':
-        indicators = [{ indicatorType: 'MACD', period1: 12, period2: 26, threshold1: 9, threshold2: null }];
-        break;
-      case 'BOLLINGER_BANDS':
-        indicators = [{ indicatorType: 'BOLLINGER', period1: 20, period2: null, threshold1: 2, threshold2: null }];
-        break;
-      default:
-        indicators = [];
+      case 'SMA_CROSSOVER': ind = { indicatorType: 'SMA', period1: 20, period2: 50, threshold1: null, threshold2: null }; break;
+      case 'RSI': ind = { indicatorType: 'RSI', period1: 14, period2: null, threshold1: 30, threshold2: 70 }; break;
+      case 'MACD': ind = { indicatorType: 'MACD', period1: 12, period2: 26, threshold1: 9, threshold2: null }; break;
+      case 'BOLLINGER_BANDS': ind = { indicatorType: 'BOLLINGER', period1: 20, period2: null, threshold1: 2, threshold2: null }; break;
+      default: ind = {};
     }
-    setForm({ ...form, type, indicators });
+    setForm({ ...form, type, indicators: [ind] });
   };
 
-  const handleSubmit = async (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-    try {
-      await api.createStrategy(form);
-      setShowForm(false);
-      setForm({ name: '', description: '', type: 'SMA_CROSSOVER', indicators: [{ indicatorType: 'SMA', period1: 20, period2: 50, threshold1: null, threshold2: null }] });
-      loadStrategies();
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+    try { await api.createStrategy(form); setShowModal(false); loadStrategies(); } catch (err) { alert(err.message); }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this strategy?')) return;
-    try {
-      await api.deleteStrategy(id);
-      loadStrategies();
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+    if (!window.confirm('Delete this strategy?')) return;
+    try { await api.deleteStrategy(id); loadStrategies(); } catch (err) { alert(err.message); }
   };
 
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'SMA_CROSSOVER': return 'badge-green';
-      case 'RSI': return 'badge-purple';
-      case 'MACD': return 'badge-blue';
-      case 'BOLLINGER_BANDS': return 'badge-amber';
-      default: return 'badge-blue';
-    }
-  };
-
-  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
+  if (loading) return <div className="loading-spinner" />;
 
   return (
-    <div className="page-container fade-in">
-      <div className="flex items-center justify-between mb-24" style={{ flexWrap: 'wrap', gap: '16px' }}>
-        <div className="page-header" style={{ marginBottom: 0 }}>
+    <div className="animate-in">
+      <div className="page-header">
+        <div>
           <h1 className="page-title">Strategies</h1>
-          <p className="page-subtitle">Manage your trading algorithms and indicator configurations</p>
+          <p className="page-subtitle">{strategies.length} trading strategies configured</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          <Plus size={18} /> New Strategy
-        </button>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={18} /> Create Strategy</button>
       </div>
 
-      {showForm && (
-        <div className="card mb-24" style={{ border: '1px solid rgba(0, 212, 170, 0.2)' }}>
-          <h3 className="chart-title"><Settings2 size={18} /> Create Strategy</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Strategy Name</label>
-                <input className="form-input" placeholder="e.g. Golden Cross" value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Type</label>
-                <select className="form-select" value={form.type} onChange={(e) => handleTypeChange(e.target.value)}>
-                  <option value="SMA_CROSSOVER">SMA Crossover</option>
-                  <option value="RSI">RSI</option>
-                  <option value="MACD">MACD</option>
-                  <option value="BOLLINGER_BANDS">Bollinger Bands</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <input className="form-input" placeholder="Describe your strategy" value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            </div>
-
-            <div className="card" style={{ background: 'var(--bg-tertiary)', marginBottom: '20px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '16px', color: 'var(--accent-cyan)' }}>Indicator Parameters</h4>
-              {form.indicators.map((ind, i) => (
-                <div className="form-row" key={i}>
-                  <div className="form-group">
-                    <label className="form-label">Period 1</label>
-                    <input type="number" className="form-input" value={ind.period1 || ''}
-                      onChange={(e) => { const inds = [...form.indicators]; inds[i].period1 = parseInt(e.target.value) || null; setForm({ ...form, indicators: inds }); }} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Period 2</label>
-                    <input type="number" className="form-input" value={ind.period2 || ''}
-                      onChange={(e) => { const inds = [...form.indicators]; inds[i].period2 = parseInt(e.target.value) || null; setForm({ ...form, indicators: inds }); }} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Threshold 1</label>
-                    <input type="number" step="0.1" className="form-input" value={ind.threshold1 || ''}
-                      onChange={(e) => { const inds = [...form.indicators]; inds[i].threshold1 = parseFloat(e.target.value) || null; setForm({ ...form, indicators: inds }); }} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Threshold 2</label>
-                    <input type="number" step="0.1" className="form-input" value={ind.threshold2 || ''}
-                      onChange={(e) => { const inds = [...form.indicators]; inds[i].threshold2 = parseFloat(e.target.value) || null; setForm({ ...form, indicators: inds }); }} />
+      {strategies.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+          {strategies.map((s, i) => (
+            <div key={s.id} className="card" style={{ animationDelay: `${i * 0.05}s` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ fontSize: '28px' }}>{typeIcons[s.type] || '📊'}</div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>{s.name}</h3>
+                    <span className="badge badge-primary" style={{ marginTop: '4px', display: 'inline-block' }}>{typeLabels[s.type] || s.type}</span>
                   </div>
                 </div>
-              ))}
+                <button className="btn btn-danger btn-sm btn-icon" onClick={() => handleDelete(s.id)}><Trash2 size={14} /></button>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '12px', lineHeight: 1.5 }}>{s.description}</p>
+              {s.indicators?.length > 0 && (
+                <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg)', borderRadius: '10px', fontSize: '13px' }}>
+                  <div style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>Parameters</div>
+                  {s.indicators.map((ind, j) => (
+                    <div key={j} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {ind.period1 && <span>Period 1: <strong>{ind.period1}</strong></span>}
+                      {ind.period2 && <span>Period 2: <strong>{ind.period2}</strong></span>}
+                      {ind.threshold1 != null && <span>Threshold 1: <strong>{ind.threshold1}</strong></span>}
+                      {ind.threshold2 != null && <span>Threshold 2: <strong>{ind.threshold2}</strong></span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
-            <div className="flex gap-12">
-              <button type="submit" className="btn btn-primary">Create Strategy</button>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
-            </div>
-          </form>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+          <h3>No strategies yet</h3>
+          <p>Create your first trading strategy to get started.</p>
+          <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => setShowModal(true)}><Plus size={18} /> Create Strategy</button>
         </div>
       )}
 
-      {strategies.length > 0 ? (
-        <div className="card">
-          <div className="data-table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Description</th>
-                  <th>Parameters</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {strategies.map((s) => (
-                  <tr key={s.id}>
-                    <td style={{ fontWeight: 600, fontFamily: 'Inter', color: 'var(--text-bright)' }}>{s.name}</td>
-                    <td><span className={`badge ${getTypeColor(s.type)}`}>{s.type.replace('_', ' ')}</span></td>
-                    <td style={{ fontFamily: 'Inter', color: 'var(--text-secondary)', maxWidth: '250px' }}>{s.description || '—'}</td>
-                    <td>
-                      {s.indicators?.map((ind, i) => (
-                        <span key={i} style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          P1:{ind.period1 || '—'} P2:{ind.period2 || '—'} T1:{ind.threshold1 || '—'} T2:{ind.threshold2 || '—'}
-                        </span>
-                      ))}
-                    </td>
-                    <td>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="card">
-          <div className="empty-state">
-            <div className="empty-state-icon">🧠</div>
-            <p className="empty-state-text">No strategies created yet.</p>
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-              <Plus size={18} /> Create First Strategy
-            </button>
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px' }}>Create Strategy</h2>
+              <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setShowModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreate}>
+              <div className="form-group">
+                <label className="form-label">Strategy Name</label>
+                <input className="form-input" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Aggressive SMA" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <textarea className="form-input" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe your strategy..." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Strategy Type</label>
+                <select className="form-select" value={form.type} onChange={e => handleTypeChange(e.target.value)}>
+                  <option value="SMA_CROSSOVER">SMA Crossover</option>
+                  <option value="RSI">RSI Reversal</option>
+                  <option value="MACD">MACD Crossover</option>
+                  <option value="BOLLINGER_BANDS">Bollinger Bands</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group"><label className="form-label">Period 1</label><input className="form-input" type="number" value={form.indicators[0]?.period1 || ''} onChange={e => setForm({ ...form, indicators: [{ ...form.indicators[0], period1: parseInt(e.target.value) || null }] })} /></div>
+                <div className="form-group"><label className="form-label">Period 2</label><input className="form-input" type="number" value={form.indicators[0]?.period2 || ''} onChange={e => setForm({ ...form, indicators: [{ ...form.indicators[0], period2: parseInt(e.target.value) || null }] })} /></div>
+                <div className="form-group"><label className="form-label">Threshold 1</label><input className="form-input" type="number" step="0.1" value={form.indicators[0]?.threshold1 || ''} onChange={e => setForm({ ...form, indicators: [{ ...form.indicators[0], threshold1: parseFloat(e.target.value) || null }] })} /></div>
+                <div className="form-group"><label className="form-label">Threshold 2</label><input className="form-input" type="number" step="0.1" value={form.indicators[0]?.threshold2 || ''} onChange={e => setForm({ ...form, indicators: [{ ...form.indicators[0], threshold2: parseFloat(e.target.value) || null }] })} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Create Strategy</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
