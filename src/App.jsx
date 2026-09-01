@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import ServerStatusBanner from './components/ServerStatusBanner';
 
 // Pages - lazy load to optimize bundles
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -17,6 +18,7 @@ export default function App() {
       <div className="app-layout">
         <Sidebar />
         <main className="main-content">
+          <ServerStatusBanner />
           <Suspense fallback={
             <div className="loading-spinner" style={{ minHeight: '80vh' }}>
               <div className="spinner" />
