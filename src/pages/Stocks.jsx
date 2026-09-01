@@ -6,27 +6,54 @@ import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 const exchangeColors = { NSE: 'badge-success', NASDAQ: 'badge-primary', NYSE: 'badge-warning' };
 
+// Module-level cache so returning to the page is instantaneous
+let cachedStocks = null;
+let cachedPrices = {};
+
 export default function Stocks() {
-  const [stocks, setStocks] = useState([]);
-  const [prices, setPrices] = useState({});
+  const [stocks, setStocks] = useState(cachedStocks || []);
+  const [prices, setPrices] = useState(cachedPrices || {});
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedStocks);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.getStocks().then(async (data) => {
-      setStocks(data);
-      const priceMap = {};
-      await Promise.all(data.map(async (s) => {
-        try {
-          const p = await api.getStockPrices(s.id);
-          priceMap[s.id] = p;
-        } catch (e) { /* skip */ }
-      }));
-      setPrices(priceMap);
-      setLoading(false);
-    });
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const data = await api.getStocks();
+        if (!isMounted) return;
+
+        cachedStocks = data;
+        setStocks(data);
+        setLoading(false); // Render cards IMMEDIATELY with zero blocking
+
+        // Fetch sparkline price histories asynchronously in the background
+        data.forEach(async (s) => {
+          if (cachedPrices[s.id]) return; // already cached
+          try {
+            const p = await api.getStockPrices(s.id);
+            if (isMounted) {
+              cachedPrices[s.id] = p;
+              setPrices(prev => ({ ...prev, [s.id]: p }));
+            }
+          } catch (e) {
+            // Ignore single stock price error
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load stocks:', err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filtered = stocks.filter(s => {
@@ -37,10 +64,10 @@ export default function Stocks() {
 
   const getChange = (stockId) => {
     const p = prices[stockId];
-    if (!p || p.length < 2) return { value: 0, pct: 0 };
+    if (!p || p.length < 2) return { value: 0, pct: 0, loaded: false };
     const last = p[p.length - 1].closePrice;
     const prev = p[p.length - 2].closePrice;
-    return { value: last - prev, pct: ((last - prev) / prev * 100) };
+    return { value: last - prev, pct: ((last - prev) / prev * 100), loaded: true };
   };
 
   const getCurrency = (exchange) => exchange === 'NSE' ? '₹' : '$';
@@ -74,7 +101,7 @@ export default function Stocks() {
         {filtered.map((stock, i) => {
           const change = getChange(stock.id);
           const sparkData = (prices[stock.id] || []).slice(-30).map(p => ({ v: p.closePrice }));
-          const lastPrice = prices[stock.id]?.length > 0 ? prices[stock.id][prices[stock.id].length - 1].closePrice : 0;
+          const lastPrice = prices[stock.id]?.length > 0 ? prices[stock.id][prices[stock.id].length - 1].closePrice : null;
           const isPositive = change.pct >= 0;
 
           return (
@@ -90,11 +117,19 @@ export default function Stocks() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '16px' }}>
                 <div>
-                  <div className="stock-price">{getCurrency(stock.exchange)}{lastPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
-                  <div className={`stock-change ${isPositive ? 'positive' : 'negative'}`}>
-                    {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    <span>{isPositive ? '+' : ''}{change.pct.toFixed(2)}%</span>
+                  <div className="stock-price">
+                    {lastPrice !== null ? (
+                      `${getCurrency(stock.exchange)}${lastPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading live price...</span>
+                    )}
                   </div>
+                  {change.loaded && (
+                    <div className={`stock-change ${isPositive ? 'positive' : 'negative'}`}>
+                      {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                      <span>{isPositive ? '+' : ''}{change.pct.toFixed(2)}%</span>
+                    </div>
+                  )}
                 </div>
                 <div style={{ width: '80px', height: '40px' }}>
                   {sparkData.length > 2 && (
