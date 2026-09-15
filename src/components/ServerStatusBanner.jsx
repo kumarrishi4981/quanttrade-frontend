@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Zap, CheckCircle2 } from 'lucide-react';
-import { api } from '../services/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://quanttrade-api.onrender.com/api';
 
 export default function ServerStatusBanner() {
   const [status, setStatus] = useState('checking'); // 'checking' | 'waking' | 'ready' | 'hidden'
@@ -8,6 +8,7 @@ export default function ServerStatusBanner() {
 
   useEffect(() => {
     let timer;
+    let pollInterval;
     let isMounted = true;
     const startTime = Date.now();
 
@@ -16,10 +17,10 @@ export default function ServerStatusBanner() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-        await api.getStocks();
+        const res = await fetch(`${API_BASE}/stocks`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (isMounted) {
+        if (res.ok && isMounted) {
           setStatus('hidden');
           return;
         }
@@ -33,10 +34,10 @@ export default function ServerStatusBanner() {
       }
 
       // Poll until backend is awake
-      const pollInterval = setInterval(async () => {
+      pollInterval = setInterval(async () => {
         try {
-          await api.getStocks();
-          if (isMounted) {
+          const res = await fetch(`${API_BASE}/stocks`);
+          if (res.ok && isMounted) {
             clearInterval(pollInterval);
             clearInterval(timer);
             setStatus('ready');
@@ -49,18 +50,14 @@ export default function ServerStatusBanner() {
           // Still waking up
         }
       }, 4000);
-
-      return () => {
-        clearInterval(pollInterval);
-        clearInterval(timer);
-      };
     };
 
     checkServer();
 
     return () => {
       isMounted = false;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
 
