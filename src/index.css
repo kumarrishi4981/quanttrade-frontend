@@ -817,12 +817,17 @@ body {
 /* ===== LOADING ===== */
 .loading-spinner {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 60px;
+  min-height: 40vh;
 }
 
+.loading-spinner:empty::after,
 .spinner {
+  content: '';
+  display: block;
   width: 40px;
   height: 40px;
   border: 3px solid var(--border-color);

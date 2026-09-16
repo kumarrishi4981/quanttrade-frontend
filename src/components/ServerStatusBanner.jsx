@@ -105,11 +105,11 @@ export default function ServerStatusBanner() {
       </div>
       
       <span style={{ color: '#9aa0a6' }}>
-        Render free tier spins down idle instances. Engine startup takes ~30s (<strong>{elapsedSeconds}s</strong> elapsed).
+        Render free tier spins down idle instances. Java/Spring Boot engine takes ~45–60s (<strong>{elapsedSeconds}s</strong> elapsed).
       </span>
 
       <div style={{
-        width: '120px',
+        width: '130px',
         height: '6px',
         background: 'rgba(255, 255, 255, 0.15)',
         borderRadius: '999px',
@@ -117,7 +117,7 @@ export default function ServerStatusBanner() {
         position: 'relative'
       }}>
         <div style={{
-          width: `${Math.min((elapsedSeconds / 35) * 100, 95)}%`,
+          width: `${Math.min((elapsedSeconds / 55) * 100, 95)}%`,
           height: '100%',
           background: 'linear-gradient(90deg, #00b386, #06b6d4)',
           transition: 'width 1s linear'

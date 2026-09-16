@@ -8,10 +8,40 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getDashboardSummary().then(setSummary).catch(console.error).finally(() => setLoading(false));
+    let isMounted = true;
+    let retryTimeout;
+
+    const fetchSummary = async () => {
+      try {
+        const data = await api.getDashboardSummary();
+        if (isMounted) {
+          setSummary(data);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          // Retry in 3.5s if backend is still booting
+          retryTimeout = setTimeout(fetchSummary, 3500);
+        }
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      isMounted = false;
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
   }, []);
 
-  if (loading) return <div className="loading-spinner" />;
+  if (loading) {
+    return (
+      <div className="loading-spinner" style={{ minHeight: '60vh', gap: '16px' }}>
+        <div className="spinner" />
+        <p style={{ color: '#9aa0a6', fontSize: '14px', margin: 0 }}>Connecting to engine & loading market dashboard...</p>
+      </div>
+    );
+  }
 
   const stats = [
     { label: 'Total Stocks', value: summary?.totalStocks || 0, icon: TrendingUp, color: 'purple', sub: 'Indian + Global' },
